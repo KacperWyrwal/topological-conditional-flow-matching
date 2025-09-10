@@ -605,3 +605,361 @@ class VariancePreservingConditionalFlowMatcher(ConditionalFlowMatcher):
         del xt
         t = pad_t_like_x(t, x0)
         return math.pi / 2 * (torch.cos(math.pi / 2 * t) * x1 - torch.sin(math.pi / 2 * t) * x0)
+
+
+# Topological conditional flow matching
+from .exprel import exprel 
+from .fourier_transform import FourierTransform
+
+
+class ConditionalTopologicalFlowMatcher(ConditionalFlowMatcher):
+    """
+    This class performs conditional topological flow matching.
+    """
+    def __init__(
+        self, 
+        c: float, 
+        eigenvalues: torch.Tensor, 
+        eigenvectors: torch.Tensor,
+        fourier_transform: FourierTransform,
+    ) -> None:
+        """
+        Initialize the ConditionalTopologicalFlowMatcher class.
+
+        Parameters
+        ----------
+        c : float, heat flow rate in the drift -cLX_t dt. 
+        eigenvalues : Tensor, (N, D) eigenvalues of the Laplacian.
+        eigenvectors : Tensor, (N, ) eigenvectors of the Laplacian.
+        """
+        assert c >= 0, f"{c=} should be non-negative."
+        assert torch.all(eigenvalues >= 0.0), f"Eigenvalues should be non-negative"
+        super().__init__()
+        self.eigenvalues = eigenvalues * c # absorb c into eigenvalues, reducing to the case c = 1
+        self.eigenvectors = eigenvectors
+        self.ft = fourier_transform
+        self.zero_threshold = 1e-6 if torch.get_default_dtype() == torch.float64 else 1e-8
+
+    def _Phi(self, t: torch.Tensor) -> torch.Tensor:
+        """
+        Parameters
+        ----------
+        t : FloatTensor, shape (bs)
+
+        Returns
+        -------
+        Phi: Tensor, shape (bs, *dim)
+        """
+        return torch.exp(-self.eigenvalues * t.unsqueeze(-1)) # (bs, *dim)
+
+    def _m(self, y0: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+        """
+        Parameters
+        ----------
+        y0 : Tensor, shape (bs, *dim)
+            represents the source minibatch
+        t : FloatTensor, shape (bs)
+
+        Returns
+        -------
+        mean m_t: Tensor, shape (bs, *dim)
+        """
+        return self._Phi(t) * y0
+
+    def _sigma_tilde(self, t: torch.Tensor) -> torch.Tensor:
+        """
+        Parameters
+        ----------
+        t : FloatTensor, shape (bs)
+
+        Returns
+        -------
+        sigma_tilde: Tensor, shape (bs, *dim)
+        """
+        # Prep for cases
+        res = torch.empty(*t.shape, self.eigenvalues.shape[0])
+        zero_eigval_mask = self.eigenvalues < self.zero_threshold
+        nonzero_eigvals = self.eigenvalues[~zero_eigval_mask]
+
+        # Case 1: lambda == 0
+        res[:, zero_eigval_mask] = t.unsqueeze(-1) # (bs, *dim)
+
+        # Case 2: lambda > 0
+        Phi2t = torch.exp(-nonzero_eigvals * t.unsqueeze(-1))
+        res[:, ~zero_eigval_mask] = (
+            (1.0 - Phi2t) # (bs, *dim)
+            / 
+            (2.0 * nonzero_eigvals) # (, *dim)
+        ) # (bs, *dim)
+        return res
+
+    def _b(self, yt: torch.Tensor, t: torch.Tensor | None = None) -> torch.Tensor: 
+        """
+        Returns the prior drift -cLX_t dt.
+
+        Parameters
+        ----------
+        yt : Tensor, shape (bs, *dim)
+            represents the sample from the probability path
+        t : FloatTensor, shape (bs)
+
+        Returns
+        -------
+        b : Tensor, shape (bs, *dim)
+            represents the prior drift -cLX_t dt.
+        """
+        del t
+        return -self.eigenvalues * yt 
+
+    def _bridge_m(self, y0: torch.Tensor, y1: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+        """
+        Parameters
+        ----------
+        y0 : Tensor, shape (bs, *dim)
+            represents the source minibatch
+        y1 : Tensor, shape (bs, *dim)
+            represents the target minibatch
+        t : FloatTensor, shape (bs)
+
+        Returns
+        -------
+        mean m_t: Tensor, shape (bs, *dim)
+        """
+        t1 = torch.ones_like(t)
+        mt = self._m(y0, t=t)
+        m1 = self._m(y0, t=t1)
+        sigma_tilde_t = self._sigma_tilde(t)
+        sigma_tilde_1 = self._sigma_tilde(t1)
+        return (
+            mt 
+            + 
+            (
+                self._Phi(1.0 - t)
+                *
+                sigma_tilde_t
+                / 
+                sigma_tilde_1
+            )
+            * 
+            (y1 - m1)
+        )
+
+    def _bridge_u(self, y0: torch.Tensor, y1: torch.Tensor, t: torch.Tensor, yt: torch.Tensor | None = None) -> torch.Tensor:
+        """
+        Compute the conditional vector field.
+
+        u_t(y) = exp(-cl(1-t)) / exprel(-2cl) * (y1 - m(1, y0))
+
+        Parameters
+        ----------
+        y0 : Tensor, shape (bs, *dim)
+            represents the source minibatch
+        y1 : Tensor, shape (bs, *dim)
+            represents the target minibatch
+        t : FloatTensor, shape (bs)
+        yt : Tensor, shape (bs, *dim)
+            represents the sample from the probability path
+
+        Returns
+        -------
+        u : Tensor, shape (bs, *dim)
+            represents the conditional vector field
+        """
+        del yt
+        t1 = torch.ones_like(t)
+        return (
+            self._Phi(1.0 - t)
+            /
+            exprel(-2.0 * self.eigenvalues)
+            *
+            (y1 - self._m(y0, t1))
+        )
+
+    def compute_mu_t__spectral(self, y0: torch.Tensor, y1: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+        """
+        Compute the mean of the probability path. Inputs in spectral coordinates.
+
+        Parameters
+        ----------
+        y0 : Tensor, shape (bs, *dim)
+            represents the source minibatch
+        y1 : Tensor, shape (bs, *dim)
+            represents the target minibatch
+        t : FloatTensor, shape (bs)
+
+        Returns
+        -------
+        mean mu_t: Tensor, shape (bs, *dim)
+
+        """
+        return self._bridge_m(y0, y1, t)
+
+    def sample_xt__spectral(self, y0: torch.Tensor, y1: torch.Tensor, t: torch.Tensor, epsilon: torch.Tensor | None = None):
+        """
+        Draw a sample from the probability path. Inputs in spectral coordinates.
+
+        Parameters
+        ----------
+        y0 : Tensor, shape (bs, *dim)
+            represents the source minibatch
+        y1 : Tensor, shape (bs, *dim)
+            represents the target minibatch
+        t : FloatTensor, shape (bs)
+        epsilon : Tensor, shape (bs, *dim)
+            noise sample from N(0, 1) (optional)
+
+        Returns
+        -------
+        xt : Tensor, shape (bs, *dim)
+
+        """
+        del epsilon
+        return self.compute_mu_t__spectral(y0, y1, t)
+
+    def compute_conditional_flow__spectral(self, y0: torch.Tensor, y1: torch.Tensor, t: torch.Tensor, yt: torch.Tensor | None = None) -> torch.Tensor:
+        """
+        Compute the conditional vector field. Inputs in spectral coordinates.
+
+        u_t(y) = exp(-cl(1-t)) / exprel(-2cl) * (y1 - m(1, y0))
+        """
+        return self._bridge_u(y0, y1, t, yt)
+
+    def sample_location_and_conditional_flow__spectral(self, y0, y1, t=None, return_noise=False):
+        """
+        Compute the sample xt and the conditional vector field.
+
+        Parameters
+        ----------
+        y0 : Tensor, shape (bs, *dim)
+            represents the source minibatch
+        y1 : Tensor, shape (bs, *dim)
+            represents the target minibatch
+        (optionally) t : Tensor, shape (bs)
+            represents the time levels
+            if None, drawn from uniform [0,1]
+        return_noise : bool
+            return the noise sample epsilon
+
+
+        Returns
+        -------
+        t : FloatTensor, shape (bs)
+        yt : Tensor, shape (bs, *dim)
+            represents the samples drawn from probability path pt
+        ut : conditional vector field
+        (optionally) eps: Tensor, shape (bs, *dim) such that yt = mu_t + sigma_t * epsilon
+        """
+        if t is None:
+            t = torch.rand(y0.shape[0], dtype=y0.dtype)
+        assert len(t) == y0.shape[0], "t has to have batch size dimension"
+
+        yt = self.sample_xt__spectral(y0, y1, t, epsilon=None)
+        ut = self.compute_conditional_flow__spectral(y0, y1, t, yt)
+        if return_noise:
+            raise NotImplementedError("Not implemented")
+        else:
+            return t, yt, ut
+
+    def compute_mu_t(self, x0, x1, t):
+        """
+        Compute the mean of the probability path.
+
+        Parameters
+        ----------
+        x0 : Tensor, shape (bs, *dim)
+            represents the source minibatch
+        x1 : Tensor, shape (bs, *dim)
+            represents the target minibatch
+        t : FloatTensor, shape (bs)
+
+        Returns
+        -------
+        mean mu_t: Tensor, shape (bs, *dim)
+
+        """
+        t = pad_t_like_x(t, x0)
+        raise NotImplementedError("Not implemented")
+
+    def sample_xt(self, x0, x1, t, epsilon):
+        """
+        Draw a sample from the probability path.
+
+        Parameters
+        ----------
+        x0 : Tensor, shape (bs, *dim)
+            represents the source minibatch
+        x1 : Tensor, shape (bs, *dim)
+            represents the target minibatch
+        t : FloatTensor, shape (bs)
+        epsilon : Tensor, shape (bs, *dim)
+            noise sample from N(0, 1)
+
+        Returns
+        -------
+        xt : Tensor, shape (bs, *dim)
+
+        """
+        del epsilon
+        raise NotImplementedError("Not implemented")
+
+    def compute_conditional_flow(self, x0, x1, t, xt):
+        """
+        Compute the conditional vector field.
+
+        Parameters
+        ----------
+        x0 : Tensor, shape (bs, *dim)
+            represents the source minibatch
+        x1 : Tensor, shape (bs, *dim)
+            represents the target minibatch
+        t : FloatTensor, shape (bs)
+        xt : Tensor, shape (bs, *dim)
+            represents the samples drawn from probability path pt
+
+        Returns
+        -------
+        ut : conditional vector field
+        """
+        raise NotImplementedError("Not implemented")
+
+    def sample_noise_like(self, x):
+        return torch.randn_like(x)
+
+    def sample_location_and_conditional_flow(self, x0, x1, t=None, return_noise=False):
+        """
+        Compute the sample xt and the conditional vector field.
+
+        Parameters
+        ----------
+        x0 : Tensor, shape (bs, *dim)
+            represents the source minibatch
+        x1 : Tensor, shape (bs, *dim)
+            represents the target minibatch
+        (optionally) t : Tensor, shape (bs)
+            represents the time levels
+            if None, drawn from uniform [0,1]
+        return_noise : bool
+            return the noise sample epsilon
+
+
+        Returns
+        -------
+        t : FloatTensor, shape (bs)
+        xt : Tensor, shape (bs, *dim)
+            represents the samples drawn from probability path pt
+        ut : conditional vector field
+        (optionally) eps: Tensor, shape (bs, *dim) such that xt = mu_t + sigma_t * epsilon
+        """
+        y0, y1 = self.ft.transform(x0), self.ft.transform(x1)
+
+        if return_noise:
+            t, yt, ut, eps = self.sample_location_and_conditional_flow__spectral(y0, y1, t, return_noise)
+        else:
+            t, yt, ut = self.sample_location_and_conditional_flow__spectral(y0, y1, t, return_noise)
+        
+        xt, vt = self.ft.inverse_transform(yt), self.ft.inverse_transform(ut)
+
+        if return_noise:
+            return t, xt, vt, eps
+        else:
+            return t, xt, vt

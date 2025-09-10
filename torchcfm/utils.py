@@ -3,7 +3,6 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import torchdyn
 from torchdyn.datasets import generate_moons
 
 # Implement some helper functions
