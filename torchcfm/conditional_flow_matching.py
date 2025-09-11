@@ -638,7 +638,10 @@ class ConditionalTopologicalFlowMatcher(ConditionalFlowMatcher):
         self.eigenvalues = eigenvalues * c # absorb c into eigenvalues, reducing to the case c = 1
         self.eigenvectors = eigenvectors
         self.ft = fourier_transform
-        self.zero_threshold = 1e-6 if torch.get_default_dtype() == torch.float64 else 1e-8
+        self.zero_threshold = 1e-8 if torch.get_default_dtype() == torch.float64 else 1e-6
+
+        # Precompute some stuff 
+        self._exprel_2lambda = exprel(-2.0 * self.eigenvalues)
 
     def _Phi(self, t: torch.Tensor) -> torch.Tensor:
         """
@@ -649,6 +652,7 @@ class ConditionalTopologicalFlowMatcher(ConditionalFlowMatcher):
         Returns
         -------
         Phi: Tensor, shape (bs, *dim)
+            exp(-c \lambda t)
         """
         return torch.exp(-self.eigenvalues * t.unsqueeze(-1)) # (bs, *dim)
 
@@ -685,7 +689,7 @@ class ConditionalTopologicalFlowMatcher(ConditionalFlowMatcher):
         res[:, zero_eigval_mask] = t.unsqueeze(-1) # (bs, *dim)
 
         # Case 2: lambda > 0
-        Phi2t = torch.exp(-nonzero_eigvals * t.unsqueeze(-1))
+        Phi2t = torch.exp(-nonzero_eigvals * 2 * t.unsqueeze(-1))
         res[:, ~zero_eigval_mask] = (
             (1.0 - Phi2t) # (bs, *dim)
             / 
@@ -744,6 +748,14 @@ class ConditionalTopologicalFlowMatcher(ConditionalFlowMatcher):
             (y1 - m1)
         )
 
+    def _bridge_kappa(self, t: torch.Tensor) -> torch.Tensor:
+        return (self._Phi(1.0 - t) / self._exprel_2lambda)
+    
+    def _bridge_u_over_kappa(self, y0: torch.Tensor, y1: torch.Tensor, t: torch.Tensor, yt: torch.Tensor | None = None) -> torch.Tensor:
+        del yt 
+        t1 = torch.ones_like(t)
+        return y1 - self._m(y0, t1)
+
     def _bridge_u(self, y0: torch.Tensor, y1: torch.Tensor, t: torch.Tensor, yt: torch.Tensor | None = None) -> torch.Tensor:
         """
         Compute the conditional vector field.
@@ -765,15 +777,7 @@ class ConditionalTopologicalFlowMatcher(ConditionalFlowMatcher):
         u : Tensor, shape (bs, *dim)
             represents the conditional vector field
         """
-        del yt
-        t1 = torch.ones_like(t)
-        return (
-            self._Phi(1.0 - t)
-            /
-            exprel(-2.0 * self.eigenvalues)
-            *
-            (y1 - self._m(y0, t1))
-        )
+        return self._bridge_kappa(t) * self._bridge_u_over_kappa(y0, y1, t, yt)
 
     def compute_mu_t__spectral(self, y0: torch.Tensor, y1: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
         """
@@ -820,9 +824,9 @@ class ConditionalTopologicalFlowMatcher(ConditionalFlowMatcher):
         """
         Compute the conditional vector field. Inputs in spectral coordinates.
 
-        u_t(y) = exp(-cl(1-t)) / exprel(-2cl) * (y1 - m(1, y0))
+        u_t(y) = y1 - m(1, y0)
         """
-        return self._bridge_u(y0, y1, t, yt)
+        return self._bridge_u_over_kappa(y0, y1, t, yt)
 
     def sample_location_and_conditional_flow__spectral(self, y0, y1, t=None, return_noise=False):
         """
@@ -963,3 +967,25 @@ class ConditionalTopologicalFlowMatcher(ConditionalFlowMatcher):
             return t, xt, vt, eps
         else:
             return t, xt, vt
+
+
+class TopologicalVectorField(torch.nn.Module):
+    def __init__(self, u_over_kappa_fn: torch.nn.Module, fm: ConditionalTopologicalFlowMatcher):
+        super().__init__()
+        self.u_over_kappa_fn = u_over_kappa_fn
+        self.fm = fm 
+    
+    def forward(self, t: torch.Tensor, x: torch.Tensor, y: torch.Tensor=None, *args, **kwargs) -> torch.Tensor:        
+        # standard coordinates computations
+        u_over_kappa = self.u_over_kappa_fn(t=t, x=x, y=y, *args, **kwargs)
+        u_over_kappa_spectral = self.fm.ft.transform(u_over_kappa)
+
+        # spectral coordinates computations
+        x_spectral = self.fm.ft.transform(x)
+        kappa = self.fm._bridge_kappa(t=t)
+        u_spectral = kappa * u_over_kappa_spectral
+        b_spectral = self.fm._b(x_spectral, t)
+        dx_spectral = b_spectral + u_spectral 
+        dx = self.fm.ft.inverse_transform(dx_spectral)
+
+        return dx
