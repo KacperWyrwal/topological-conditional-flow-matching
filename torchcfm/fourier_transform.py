@@ -110,12 +110,12 @@ class NaiveGridFourierTransform(FourierTransform):
     def __init__(self, shape: tuple[int, ...], eigenvectors: torch.Tensor) -> None:
         """
         params:
-            eigenvectors: torch.Tensor, shape (K, N1 * N2 * ... * Nk)
+            eigenvectors: torch.Tensor, shape (N1 * N2 * ... * Nk, K)
         """
         super().__init__()
         self.shape = shape
         self.dim = len(shape)
-        self.eigenvectors = eigenvectors
+        self.eigenvectors = eigenvectors.mT # (K, N1 * N2 * ... * Nk)
 
     def transform(self, x: torch.Tensor) -> torch.Tensor:
         """
