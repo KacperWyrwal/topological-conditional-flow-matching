@@ -923,3 +923,24 @@ class UNetModelWrapper(UNetModel):
 
     def forward(self, t, x, y=None, *args, **kwargs):
         return super().forward(t, x, y=y)
+
+
+
+class TimeIndependentUNetModel(UNetModel):
+    """A UNetModel that accepts timesteps but ignores them.
+
+    The forward signature matches `UNetModel` (time first), but the provided
+    time is replaced with a zero-timestep before passing to the parent
+    implementation, making the network effectively time-independent.
+    """
+
+    def forward(self, t, x, y=None):
+        # Normalize input timestep shape to 1-D batch, then zero it out.
+        timesteps = t
+        while timesteps.dim() > 1:
+            timesteps = timesteps[:, 0]
+        if timesteps.dim() == 0:
+            timesteps = timesteps.repeat(x.shape[0])
+        zero_timesteps = th.zeros_like(timesteps)
+        return super().forward(zero_timesteps, x, y=y)
+
