@@ -20,6 +20,7 @@ from torchcfm.conditional_flow_matching import (
     VariancePreservingConditionalFlowMatcher,
     ConditionalTopologicalFlowMatcher,
     ExactOptimalTransportConditionalTopologicalFlowMatcher,
+    TopologicalVectorField,
 )
 from torchcfm.fourier_transform import NaiveGridFourierTransform, grid_laplacian_eigenpairs
 from torchcfm.initial_distribution import HeatGP
@@ -58,6 +59,7 @@ flags.DEFINE_integer(
 
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
+torch.set_default_device(device)
 
 
 def warmup_lr(step):
@@ -206,6 +208,8 @@ def train(argv):
     FM = build_fm()
     p0 = build_p0()
     loss = build_loss(FM)
+    net_vector_field = TopologicalVectorField(u_over_kappa_fn=net_model, fm=FM)
+    ema_vector_field = TopologicalVectorField(u_over_kappa_fn=ema_model, fm=FM)
 
     savedir = FLAGS.output_dir + SAVE_NAME + "/"
     os.makedirs(savedir, exist_ok=True)
@@ -226,8 +230,8 @@ def train(argv):
 
             # sample and Saving the weights
             if FLAGS.save_step > 0 and step % FLAGS.save_step == 0:
-                generate_samples(net_model, FLAGS.parallel, savedir, step, net_="normal")
-                generate_samples(ema_model, FLAGS.parallel, savedir, step, net_="ema")
+                generate_samples(net_vector_field, FLAGS.parallel, savedir, step, net_="normal")
+                generate_samples(ema_vector_field, FLAGS.parallel, savedir, step, net_="ema")
                 torch.save(
                     {
                         "net_model": net_model.state_dict(),
