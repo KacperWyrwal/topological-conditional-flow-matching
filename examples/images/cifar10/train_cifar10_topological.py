@@ -59,8 +59,6 @@ flags.DEFINE_integer(
 
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
-torch.set_default_device(device)
-
 
 def warmup_lr(step):
     return min(step, FLAGS.warmup) / FLAGS.warmup
@@ -83,6 +81,7 @@ def build_fm() -> ConditionalTopologicalFlowMatcher:
             shape=input_shape,
             boundary_conditions="neumann",
         )
+        eigvecs, eigvals = eigvecs.to(device), eigvals.to(device)
         fourier_transform = NaiveGridFourierTransform(
             shape=input_shape,
             eigenvectors=eigvecs,
@@ -99,6 +98,7 @@ def build_fm() -> ConditionalTopologicalFlowMatcher:
             shape=input_shape,
             boundary_conditions="neumann",
         )
+        eigvecs, eigvals = eigvecs.to(device), eigvals.to(device)
         fourier_transform = NaiveGridFourierTransform(
             shape=input_shape,
             eigenvectors=eigvecs,
@@ -131,9 +131,12 @@ def build_p0() -> HeatGP:
             shape=input_shape,
             boundary_conditions="neumann",
         )
+        eigvecs, eigvals = eigvecs.to(device), eigvals.to(device)
         return HeatGP(eigvals, eigvecs, c, input_shape)
     elif FLAGS.p0 == "normal":
-        return torch.distributions.Normal(torch.zeros(*input_shape), torch.ones(*input_shape))
+        return torch.distributions.Normal(
+            torch.zeros(*input_shape), torch.ones(*input_shape)
+        ).to(device)
     else:
         raise NotImplementedError(
             f"Unknown p0 {FLAGS.p0}, must be one of ['gp', 'normal']"
@@ -169,7 +172,6 @@ def train(argv):
         shuffle=True,
         num_workers=FLAGS.num_workers,
         drop_last=True,
-        generator=torch.Generator(device=device),
     )
 
     datalooper = infiniteloop(dataloader)
