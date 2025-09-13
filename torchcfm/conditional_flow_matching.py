@@ -854,7 +854,7 @@ class ConditionalTopologicalFlowMatcher(ConditionalFlowMatcher):
         (optionally) eps: Tensor, shape (bs, *dim) such that yt = mu_t + sigma_t * epsilon
         """
         if t is None:
-            t = torch.rand(y0.shape[0], dtype=y0.dtype)
+            t = torch.rand(y0.shape[0], dtype=y0.dtype, device=y0.device)
         assert len(t) == y0.shape[0], "t has to have batch size dimension"
 
         yt = self.sample_xt__spectral(y0, y1, t, epsilon=None)
