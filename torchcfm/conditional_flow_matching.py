@@ -681,7 +681,7 @@ class ConditionalTopologicalFlowMatcher(ConditionalFlowMatcher):
         sigma_tilde: Tensor, shape (bs, *dim)
         """
         # Prep for cases
-        res = torch.empty(*t.shape, self.eigenvalues.shape[0])
+        res = t.new_empty(*t.shape, self.eigenvalues.shape[0])
         zero_eigval_mask = self.eigenvalues < self.zero_threshold
         nonzero_eigvals = self.eigenvalues[~zero_eigval_mask]
 
