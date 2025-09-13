@@ -169,6 +169,7 @@ def train(argv):
         shuffle=True,
         num_workers=FLAGS.num_workers,
         drop_last=True,
+        generator=torch.Generator(device=device),
     )
 
     datalooper = infiniteloop(dataloader)
