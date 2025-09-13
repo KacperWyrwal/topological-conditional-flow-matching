@@ -132,7 +132,7 @@ def build_p0() -> HeatGP:
             boundary_conditions="neumann",
         )
         eigvecs, eigvals = eigvecs.to(device), eigvals.to(device)
-        return HeatGP(eigvals, eigvecs, c, input_shape)
+        return HeatGP(eigvals, eigvecs, c, input_shape, device)
     elif FLAGS.p0 == "normal":
         return torch.distributions.Normal(
             torch.zeros(*input_shape), torch.ones(*input_shape)
@@ -221,7 +221,7 @@ def train(argv):
         for step in pbar:
             optim.zero_grad()
             x1 = next(datalooper).to(device)
-            x0 = p0.sample(FLAGS.batch_size)
+            x0 = p0.sample((FLAGS.batch_size, ))
             t, xt, ut = FM.sample_location_and_conditional_flow(x0, x1)
             vt = net_model(t, xt)
             loss = loss(vt, ut, t)
