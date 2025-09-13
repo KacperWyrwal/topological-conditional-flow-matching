@@ -210,7 +210,7 @@ def train(argv):
     ### Flow matcher 
     FM = build_fm()
     p0 = build_p0()
-    loss = build_loss(FM)
+    loss_fn = build_loss(FM)
     net_vector_field = TopologicalVectorField(u_over_kappa_fn=net_model, fm=FM)
     ema_vector_field = TopologicalVectorField(u_over_kappa_fn=ema_model, fm=FM)
 
@@ -224,7 +224,7 @@ def train(argv):
             x0 = p0.sample((FLAGS.batch_size, ))
             t, xt, ut = FM.sample_location_and_conditional_flow(x0, x1)
             vt = net_model(t, xt)
-            loss = loss(vt, ut, t)
+            loss = loss_fn(vt, ut, t)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(net_model.parameters(), FLAGS.grad_clip)  # new
             optim.step()
