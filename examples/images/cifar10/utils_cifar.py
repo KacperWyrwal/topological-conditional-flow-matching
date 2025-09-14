@@ -40,13 +40,15 @@ def setup(
     )
 
 
-def generate_samples(model, parallel, savedir, step, net_="normal"):
+def generate_samples(model, p0, parallel, savedir, step, net_="normal"):
     """Save 64 generated images (8 x 8) for sanity check along training.
 
     Parameters
     ----------
     model:
         represents the neural network that we want to generate samples from
+    p0:
+        represents the initial distribution
     parallel: bool
         represents the parallel training flag. Torchdyn only runs on 1 GPU, we need to send the models from several GPUs to 1 GPU.
     savedir: str
@@ -64,7 +66,8 @@ def generate_samples(model, parallel, savedir, step, net_="normal"):
     node_ = NeuralODE(model_, solver="euler", sensitivity="adjoint")
     with torch.no_grad():
         traj = node_.trajectory(
-            torch.randn(64, 3, 32, 32, device=device),
+            p0.sample((64, )).to(device),
+            # torch.randn(64, 3, 32, 32, device=device),
             t_span=torch.linspace(0, 1, 100, device=device),
         )
         traj = traj[-1, :].view([-1, 3, 32, 32]).clip(-1, 1)

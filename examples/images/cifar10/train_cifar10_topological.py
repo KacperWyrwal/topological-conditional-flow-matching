@@ -233,8 +233,8 @@ def train(argv):
 
             # sample and Saving the weights
             if FLAGS.save_step > 0 and step % FLAGS.save_step == 0:
-                generate_samples(net_vector_field, FLAGS.parallel, savedir, step, net_="normal")
-                generate_samples(ema_vector_field, FLAGS.parallel, savedir, step, net_="ema")
+                generate_samples(net_vector_field, p0, FLAGS.parallel, savedir, step, net_="normal")
+                generate_samples(ema_vector_field, p0, FLAGS.parallel, savedir, step, net_="ema")
                 torch.save(
                     {
                         "net_model": net_model.state_dict(),
