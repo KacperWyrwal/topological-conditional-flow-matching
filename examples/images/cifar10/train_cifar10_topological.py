@@ -135,8 +135,8 @@ def build_p0() -> HeatGP:
         return HeatGP(eigvals, eigvecs, c, input_shape, device)
     elif FLAGS.p0 == "normal":
         return torch.distributions.Normal(
-            torch.zeros(*input_shape), torch.ones(*input_shape)
-        ).to(device)
+            torch.zeros(*input_shape, device=device), torch.ones(*input_shape, device=device)
+        )
     else:
         raise NotImplementedError(
             f"Unknown p0 {FLAGS.p0}, must be one of ['gp', 'normal']"
