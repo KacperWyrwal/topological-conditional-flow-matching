@@ -46,13 +46,16 @@ def build_p0() -> HeatGP:
             shape=input_shape,
             boundary_conditions="neumann",
         )
-        return HeatGP(eigvals, eigvecs, c, input_shape)
+        eigvecs, eigvals = eigvecs.to(device), eigvals.to(device)
+        return HeatGP(eigvals, eigvecs, c, input_shape, device)
     elif FLAGS.p0 == "normal":
-        return torch.distributions.Normal(torch.zeros(*input_shape), torch.ones(*input_shape))
-    else:
-        raise NotImplementedError(
-            f"Unknown p0 {FLAGS.p0}, must be one of ['gp', 'normal']"
+        return torch.distributions.Normal(
+            torch.zeros(*input_shape, device=device), torch.ones(*input_shape, device=device)
         )
+    raise NotImplementedError(
+        f"Unknown p0 {FLAGS.p0}, must be one of ['gp', 'normal']"
+    )
+
 
 def build_fm() -> ConditionalTopologicalFlowMatcher:
     sigma = 0.0
@@ -71,6 +74,7 @@ def build_fm() -> ConditionalTopologicalFlowMatcher:
             shape=input_shape,
             boundary_conditions="neumann",
         )
+        eigvecs, eigvals = eigvecs.to(device), eigvals.to(device)
         fourier_transform = NaiveGridFourierTransform(
             shape=input_shape,
             eigenvectors=eigvecs,
@@ -87,6 +91,7 @@ def build_fm() -> ConditionalTopologicalFlowMatcher:
             shape=input_shape,
             boundary_conditions="neumann",
         )
+        eigvecs, eigvals = eigvecs.to(device), eigvals.to(device)
         fourier_transform = NaiveGridFourierTransform(
             shape=input_shape,
             eigenvectors=eigvecs,
@@ -105,7 +110,6 @@ def build_fm() -> ConditionalTopologicalFlowMatcher:
 # Define the model
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda:0" if use_cuda else "cpu")
-torch.set_default_device(device)
 
 new_net = UNetModelWrapper(
     dim=(3, 32, 32),
@@ -148,7 +152,7 @@ if FLAGS.integration_method == "euler":
 
 def gen_1_img(unused_latent):
     with torch.no_grad():
-        x = p0.sample(FLAGS.batch_size_fid)
+        x = p0.sample((FLAGS.batch_size_fid, ))
         if FLAGS.integration_method == "euler":
             print("Use method: ", FLAGS.integration_method)
             t_span = torch.linspace(0, 1, FLAGS.integration_steps + 1, device=device)
