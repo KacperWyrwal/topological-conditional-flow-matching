@@ -34,6 +34,7 @@ flags.DEFINE_float("tol", 1e-5, help="Integrator tolerance (absolute and relativ
 flags.DEFINE_integer("batch_size_fid", 1024, help="Batch size to compute FID")
 flags.DEFINE_string("p0", "gp", help="initial distribution type")
 flags.DEFINE_float("c", 1.0, help="c parameter for topological flow matcher")
+flags.DEFINE_string("loss", "time_dependent", help="loss type")
 
 FLAGS(sys.argv)
 
