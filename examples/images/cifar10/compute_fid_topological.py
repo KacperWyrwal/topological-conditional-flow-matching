@@ -26,16 +26,18 @@ flags.DEFINE_integer("num_channel", 128, help="base channel of UNet")
 # Training
 flags.DEFINE_string("input_dir", "./results", help="output_directory")
 flags.DEFINE_string("model", "otcfm", help="flow matching model type")
-flags.DEFINE_string("ft_grid", "3d", help="grid Fourier transform type")
 flags.DEFINE_integer("integration_steps", 100, help="number of inference steps")
 flags.DEFINE_string("integration_method", "dopri5", help="integration method to use")
 flags.DEFINE_integer("step", 400000, help="training steps")
 flags.DEFINE_integer("num_gen", 50000, help="number of samples to generate")
 flags.DEFINE_float("tol", 1e-5, help="Integrator tolerance (absolute and relative)")
 flags.DEFINE_integer("batch_size_fid", 1024, help="Batch size to compute FID")
+
 flags.DEFINE_string("p0", "gp", help="initial distribution type")
 flags.DEFINE_float("c", 1.0, help="c parameter for topological flow matcher")
 flags.DEFINE_string("loss", "time_dependent", help="loss type")
+flags.DEFINE_string("ft_grid", "3d", help="grid Fourier transform type")
+flags.DEFINE_string("boundary_conditions", "neumann", help="boundary conditions")
 
 FLAGS(sys.argv)
 
