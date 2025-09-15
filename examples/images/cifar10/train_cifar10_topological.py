@@ -33,7 +33,7 @@ flags.DEFINE_string("model", "otcfm", help="flow matching model type")
 flags.DEFINE_string("output_dir", "./results/", help="output_directory")
 flags.DEFINE_string("p0", "gp", help="initial distribution type")
 flags.DEFINE_string("loss", "time_dependent", help="loss type")
-flags.DEFINE_string("ft_grid", "2d", help="grid Fourier transform type")
+flags.DEFINE_string("ft_grid", "3d", help="grid Fourier transform type")
 flags.DEFINE_string("boundary_conditions", "neumann", help="boundary conditions")
 
 # UNet

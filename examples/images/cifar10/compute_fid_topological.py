@@ -26,7 +26,7 @@ flags.DEFINE_integer("num_channel", 128, help="base channel of UNet")
 # Training
 flags.DEFINE_string("input_dir", "./results", help="output_directory")
 flags.DEFINE_string("model", "otcfm", help="flow matching model type")
-flags.DEFINE_string("ft_grid", "2d", help="grid Fourier transform type")
+flags.DEFINE_string("ft_grid", "3d", help="grid Fourier transform type")
 flags.DEFINE_integer("integration_steps", 100, help="number of inference steps")
 flags.DEFINE_string("integration_method", "dopri5", help="integration method to use")
 flags.DEFINE_integer("step", 400000, help="training steps")
