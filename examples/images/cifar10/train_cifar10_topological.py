@@ -142,11 +142,7 @@ def build_p0() -> HeatGP:
     input_shape = (3, 32, 32)
     c = FLAGS.c
     if FLAGS.p0 == "gp":
-        eigvecs, eigvals = grid_laplacian_eigenpairs(
-            shape=input_shape,
-            boundary_conditions="neumann",
-        )
-        eigvecs, eigvals = eigvecs.to(device), eigvals.to(device)
+        eigvecs, eigvals = build_eigenbasis(input_shape)
         return HeatGP(eigvals, eigvecs, c, input_shape, device)
     elif FLAGS.p0 == "normal":
         return torch.distributions.Normal(
@@ -159,7 +155,9 @@ def build_p0() -> HeatGP:
 
 
 def train(argv):
-    SAVE_NAME = FLAGS.model + "-" + FLAGS.p0 + "-" + FLAGS.loss + "-" + str(FLAGS.c) + "-" + FLAGS.ft_grid
+    SAVE_NAME = FLAGS.model + "-" + FLAGS.p0 + "-" + FLAGS.loss + "-" + str(FLAGS.c) 
+    if FLAGS.ft_grid == "2d":
+        SAVE_NAME += "-" + FLAGS.ft_grid
     print(
         "lr, total_steps, ema decay, save_step:",
         FLAGS.lr,

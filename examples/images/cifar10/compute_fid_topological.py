@@ -26,6 +26,7 @@ flags.DEFINE_integer("num_channel", 128, help="base channel of UNet")
 # Training
 flags.DEFINE_string("input_dir", "./results", help="output_directory")
 flags.DEFINE_string("model", "otcfm", help="flow matching model type")
+flags.DEFINE_string("ft_grid", "2d", help="grid Fourier transform type")
 flags.DEFINE_integer("integration_steps", 100, help="number of inference steps")
 flags.DEFINE_string("integration_method", "dopri5", help="integration method to use")
 flags.DEFINE_integer("step", 400000, help="training steps")
@@ -39,23 +40,24 @@ flags.DEFINE_string("loss", "time_dependent", help="loss type")
 FLAGS(sys.argv)
 
 
-def build_p0() -> HeatGP:
-    input_shape = (3, 32, 32)
-    c = FLAGS.c
-    if FLAGS.p0 == "gp":
+def build_eigenbasis(input_shape):
+    C, H, W = input_shape
+    if FLAGS.ft_grid == "2d":
         eigvecs, eigvals = grid_laplacian_eigenpairs(
-            shape=input_shape,
-            boundary_conditions="neumann",
+            shape=(H, W),
+            boundary_conditions=FLAGS.boundary_conditions,
+        )
+        eigvecs = torch.kron(torch.eye(C), eigvecs)
+        eigvals = torch.kron(torch.ones(C), eigvals)
+        return eigvecs, eigvals
+    elif FLAGS.ft_grid == "3d":
+        eigvecs, eigvals = grid_laplacian_eigenpairs(
+            shape=(C, H, W),
+            boundary_conditions=FLAGS.boundary_conditions,
         )
         eigvecs, eigvals = eigvecs.to(device), eigvals.to(device)
-        return HeatGP(eigvals, eigvecs, c, input_shape, device)
-    elif FLAGS.p0 == "normal":
-        return torch.distributions.Normal(
-            torch.zeros(*input_shape, device=device), torch.ones(*input_shape, device=device)
-        )
-    raise NotImplementedError(
-        f"Unknown p0 {FLAGS.p0}, must be one of ['gp', 'normal']"
-    )
+        return eigvecs, eigvals
+    raise NotImplementedError(f"Unknown grid Fourier transform type: {FLAGS.ft_grid}")
 
 
 def build_fm() -> ConditionalTopologicalFlowMatcher:
@@ -71,11 +73,7 @@ def build_fm() -> ConditionalTopologicalFlowMatcher:
         return VariancePreservingConditionalFlowMatcher(sigma=sigma)
     elif FLAGS.model == "cfm_top":
         c = FLAGS.c
-        eigvecs, eigvals = grid_laplacian_eigenpairs(
-            shape=input_shape,
-            boundary_conditions="neumann",
-        )
-        eigvecs, eigvals = eigvecs.to(device), eigvals.to(device)
+        eigvecs, eigvals = build_eigenbasis(input_shape)
         fourier_transform = NaiveGridFourierTransform(
             shape=input_shape,
             eigenvectors=eigvecs,
@@ -88,11 +86,7 @@ def build_fm() -> ConditionalTopologicalFlowMatcher:
         )
     elif FLAGS.model == "otcfm_top":
         c = FLAGS.c
-        eigvecs, eigvals = grid_laplacian_eigenpairs(
-            shape=input_shape,
-            boundary_conditions="neumann",
-        )
-        eigvecs, eigvals = eigvecs.to(device), eigvals.to(device)
+        eigvecs, eigvals = build_eigenbasis(input_shape)
         fourier_transform = NaiveGridFourierTransform(
             shape=input_shape,
             eigenvectors=eigvecs,
@@ -106,6 +100,22 @@ def build_fm() -> ConditionalTopologicalFlowMatcher:
     raise NotImplementedError(
         f"Unknown model {FLAGS.model}, must be one of ['otcfm', 'icfm', 'fm', 'si']"
     )
+
+
+def build_p0() -> HeatGP:
+    input_shape = (3, 32, 32)
+    c = FLAGS.c
+    if FLAGS.p0 == "gp":
+        eigvecs, eigvals = build_eigenbasis(input_shape)
+        return HeatGP(eigvals, eigvecs, c, input_shape, device)
+    elif FLAGS.p0 == "normal":
+        return torch.distributions.Normal(
+            torch.zeros(*input_shape, device=device), torch.ones(*input_shape, device=device)
+        )
+    else:
+        raise NotImplementedError(
+            f"Unknown p0 {FLAGS.p0}, must be one of ['gp', 'normal']"
+        )
 
 
 # Define the model
@@ -126,6 +136,8 @@ new_net = UNetModelWrapper(
 
 # Load the model
 SAVE_NAME = FLAGS.model + "-" + FLAGS.p0 + "-" + FLAGS.loss + "-" + str(FLAGS.c)
+if FLAGS.ft_grid == "2d":
+    SAVE_NAME += "-" + FLAGS.ft_grid
 PATH = f"{FLAGS.input_dir}/{SAVE_NAME}/{SAVE_NAME}_cifar10_weights_step_{FLAGS.step}.pt"
 print("path: ", PATH)
 checkpoint = torch.load(PATH, map_location=device)
