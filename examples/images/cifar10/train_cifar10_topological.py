@@ -63,6 +63,7 @@ flags.DEFINE_integer(
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
+
 def warmup_lr(step):
     return min(step, FLAGS.warmup) / FLAGS.warmup
 
@@ -73,16 +74,17 @@ def build_eigenbasis(input_shape):
         eigvecs, eigvals = grid_laplacian_eigenpairs(
             shape=(H, W),
             boundary_conditions=FLAGS.boundary_conditions,
+            device=device,
         )
-        eigvecs = torch.kron(torch.eye(C), eigvecs)
-        eigvals = torch.kron(torch.ones(C), eigvals)
+        eigvecs = torch.kron(torch.eye(C, device=device, dtype=eigvecs.dtype), eigvecs)
+        eigvals = torch.kron(torch.ones(C, device=device, dtype=eigvals.dtype), eigvals)
         return eigvecs, eigvals
     elif FLAGS.ft_grid == "3d":
         eigvecs, eigvals = grid_laplacian_eigenpairs(
             shape=(C, H, W),
             boundary_conditions=FLAGS.boundary_conditions,
+            device=device,
         )
-        eigvecs, eigvals = eigvecs.to(device), eigvals.to(device)
         return eigvecs, eigvals
     raise NotImplementedError(f"Unknown grid Fourier transform type: {FLAGS.ft_grid}")
 
