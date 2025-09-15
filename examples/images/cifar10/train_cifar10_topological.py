@@ -33,6 +33,9 @@ flags.DEFINE_string("model", "otcfm", help="flow matching model type")
 flags.DEFINE_string("output_dir", "./results/", help="output_directory")
 flags.DEFINE_string("p0", "gp", help="initial distribution type")
 flags.DEFINE_string("loss", "time_dependent", help="loss type")
+flags.DEFINE_string("ft_grid", "2d", help="grid Fourier transform type")
+flags.DEFINE_string("boundary_conditions", "neumann", help="boundary conditions")
+
 # UNet
 flags.DEFINE_integer("num_channel", 128, help="base channel of UNet")
 
@@ -64,6 +67,26 @@ def warmup_lr(step):
     return min(step, FLAGS.warmup) / FLAGS.warmup
 
 
+def build_eigenbasis(input_shape):
+    C, H, W = input_shape
+    if FLAGS.ft_grid == "2d":
+        eigvecs, eigvals = grid_laplacian_eigenpairs(
+            shape=(H, W),
+            boundary_conditions=FLAGS.boundary_conditions,
+        )
+        eigvecs = torch.kron(torch.eye(C), eigvecs)
+        eigvals = torch.kron(torch.ones(C), eigvals)
+        return eigvecs, eigvals
+    elif FLAGS.ft_grid == "3d":
+        eigvecs, eigvals = grid_laplacian_eigenpairs(
+            shape=(C, H, W),
+            boundary_conditions=FLAGS.boundary_conditions,
+        )
+        eigvecs, eigvals = eigvecs.to(device), eigvals.to(device)
+        return eigvecs, eigvals
+    raise NotImplementedError(f"Unknown grid Fourier transform type: {FLAGS.ft_grid}")
+
+
 def build_fm() -> ConditionalTopologicalFlowMatcher:
     sigma = 0.0
     input_shape = (3, 32, 32)
@@ -77,11 +100,7 @@ def build_fm() -> ConditionalTopologicalFlowMatcher:
         return VariancePreservingConditionalFlowMatcher(sigma=sigma)
     elif FLAGS.model == "cfm_top":
         c = FLAGS.c
-        eigvecs, eigvals = grid_laplacian_eigenpairs(
-            shape=input_shape,
-            boundary_conditions="neumann",
-        )
-        eigvecs, eigvals = eigvecs.to(device), eigvals.to(device)
+        eigvecs, eigvals = build_eigenbasis(input_shape)
         fourier_transform = NaiveGridFourierTransform(
             shape=input_shape,
             eigenvectors=eigvecs,
@@ -94,11 +113,7 @@ def build_fm() -> ConditionalTopologicalFlowMatcher:
         )
     elif FLAGS.model == "otcfm_top":
         c = FLAGS.c
-        eigvecs, eigvals = grid_laplacian_eigenpairs(
-            shape=input_shape,
-            boundary_conditions="neumann",
-        )
-        eigvecs, eigvals = eigvecs.to(device), eigvals.to(device)
+        eigvecs, eigvals = build_eigenbasis(input_shape)
         fourier_transform = NaiveGridFourierTransform(
             shape=input_shape,
             eigenvectors=eigvecs,
@@ -144,7 +159,7 @@ def build_p0() -> HeatGP:
 
 
 def train(argv):
-    SAVE_NAME = FLAGS.model + "-" + FLAGS.p0 + "-" + FLAGS.loss + "-" + str(FLAGS.c)
+    SAVE_NAME = FLAGS.model + "-" + FLAGS.p0 + "-" + FLAGS.loss + "-" + str(FLAGS.c) + "-" + FLAGS.ft_grid
     print(
         "lr, total_steps, ema decay, save_step:",
         FLAGS.lr,
