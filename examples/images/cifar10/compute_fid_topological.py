@@ -169,20 +169,20 @@ def gen_1_img(unused_latent):
     img = (traj * 127.5 + 128).clip(0, 255).to(torch.uint8)  # .permute(1, 2, 0)
     return img
 
-
-print("Start computing FID")
-score = fid.compute_fid(
-    gen=gen_1_img,
-    dataset_name="cifar10",
-    batch_size=FLAGS.batch_size_fid,
-    dataset_res=32,
-    num_gen=FLAGS.num_gen,
-    dataset_split="train",
-    mode="legacy_tensorflow",
-)
-print()
-print("FID has been computed")
-# print()
-# print("Total NFE: ", new_net.nfe)
-print()
-print("FID: ", score)
+for split in ["train", "test"]:
+    print(f"Start computing FID on {split} split")
+    score = fid.compute_fid(
+        gen=gen_1_img,
+        dataset_name="cifar10",
+        batch_size=FLAGS.batch_size_fid,
+        dataset_res=32,
+        num_gen=FLAGS.num_gen,
+        dataset_split=split,
+        mode="legacy_tensorflow",
+    )
+    print()
+    print(f"FID has been computed on {split} split")
+    # print()
+    # print("Total NFE: ", new_net.nfe)
+    print()
+    print(f"FID on {split} split: ", score)
