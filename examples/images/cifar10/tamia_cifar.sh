@@ -22,10 +22,13 @@ export HF_HOME=/scratch/a/atong01/hugging_face/
 echo $SLURM_NNODES
 RUN_NAME="train_cifar_v1_seeds_23"
 
-OUT_DIR=$SCRATCH/tfm_out/
+OUT_DIR=$SCRATCH/tfm_out_interactivate/
 echo $RUN_NAME
-SEED=3
-CUDA_VISIBLE_DEVICES=0 python3 train_cifar10.py --model "icfm" --lr 2e-4 --ema_decay 0.9999 --batch_size 128 --total_steps 400001 --save_step 20000 --seed $SEED --output_dir=$OUT_DIR/icfm/$SEED/
-CUDA_VISIBLE_DEVICES=1 python3 train_cifar10.py --model "otcfm" --lr 2e-4 --ema_decay 0.9999 --batch_size 128 --total_steps 400001 --save_step 20000 --seed $SEED--output_dir=$OUT_DIR/otcfm/$SEED/
-CUDA_VISIBLE_DEVICES=2 python3 train_cifar10_topological.py --model "otcfm_top" --c 0.1 --p0 "gp" --loss "time_dependent" --lr 2e-4 --ema_decay 0.9999 --batch_size 128 --total_steps 400001 --save_step 20000 --seed $SEED--output_dir=$OUT_DIR/otcfm_top/$SEED/
-CUDA_VISIBLE_DEVICES=3 python3 train_cifar10_topological.py --model "cfm_top" --c 0.1 --p0 "gp" --loss "time_dependent" --lr 2e-4 --ema_decay 0.9999 --batch_size 128 --total_steps 400001 --save_step 20000 --seed $SEED --output_dir=$OUT_DIR/cfm_top/$SEED/
+SEED=5
+CUDA_VISIBLE_DEVICES=0 python3 train_cifar10.py --model "icfm" --lr 2e-4 --ema_decay 0.9999 --batch_size 128 --total_steps 400001 --save_step 20000 --seed $SEED --output_dir=$OUT_DIR/icfm/$SEED/ &
+CUDA_VISIBLE_DEVICES=1 python3 train_cifar10.py --model "otcfm" --lr 2e-4 --ema_decay 0.9999 --batch_size 128 --total_steps 400001 --save_step 20000 --seed $SEED --output_dir=$OUT_DIR/otcfm/$SEED/ &
+CUDA_VISIBLE_DEVICES=2 python3 train_cifar10_topological.py --model "otcfm_top" --c 0.1 --p0 "gp" --loss "time_dependent" --lr 2e-4 --ema_decay 0.9999 --batch_size 128 --total_steps 400001 --save_step 20000 --seed $SEED --output_dir=$OUT_DIR/otcfm_top/$SEED/ &
+CUDA_VISIBLE_DEVICES=3 python3 train_cifar10_topological.py --model "cfm_top" --c 0.1 --p0 "gp" --loss "time_dependent" --lr 2e-4 --ema_decay 0.9999 --batch_size 128 --total_steps 400001 --save_step 20000 --seed $SEED --output_dir=$OUT_DIR/cfm_top/$SEED/ &
+
+wait
+echo "all jobs done"
