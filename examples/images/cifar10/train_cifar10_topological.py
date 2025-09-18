@@ -63,7 +63,6 @@ flags.DEFINE_integer(
 
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
-torch.manual_seed(FLAGS.seed)
 
 
 def warmup_lr(step):
@@ -170,7 +169,9 @@ def train(argv):
         FLAGS.total_steps,
         FLAGS.ema_decay,
         FLAGS.save_step,
+        FLAGS.seed,
     )
+    torch.manual_seed(FLAGS.seed)
 
     # DATASETS/DATALOADER
     dataset = datasets.CIFAR10(
