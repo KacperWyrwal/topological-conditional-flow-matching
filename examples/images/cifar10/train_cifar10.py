@@ -104,6 +104,9 @@ def train(argv):
     ).to(
         device
     )  # new dropout + bs of 128
+    p0 = torch.distributions.Normal(
+        torch.zeros(3, 32, 32, device=device), torch.ones(3, 32, 32, device=device)
+    )
 
     ema_model = copy.deepcopy(net_model)
     optim = torch.optim.Adam(net_model.parameters(), lr=FLAGS.lr)
@@ -159,8 +162,8 @@ def train(argv):
 
             # sample and Saving the weights
             if FLAGS.save_step > 0 and step % FLAGS.save_step == 0:
-                generate_samples(net_model, FLAGS.parallel, savedir, step, net_="normal")
-                generate_samples(ema_model, FLAGS.parallel, savedir, step, net_="ema")
+                generate_samples(net_model, p0, FLAGS.parallel, savedir, step, net_="normal")
+                generate_samples(ema_model, p0, FLAGS.parallel, savedir, step, net_="ema")
                 torch.save(
                     {
                         "net_model": net_model.state_dict(),
