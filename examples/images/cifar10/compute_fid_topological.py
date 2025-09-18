@@ -35,7 +35,7 @@ flags.DEFINE_integer("batch_size_fid", 1024, help="Batch size to compute FID")
 flags.DEFINE_integer("seed", 0, help="Seed for reproducibility")
 
 flags.DEFINE_string("p0", "gp", help="initial distribution type")
-flags.DEFINE_float("c", 1.0, help="c parameter for topological flow matcher")
+flags.DEFINE_float("c", 0.1, help="c parameter for topological flow matcher")
 flags.DEFINE_string("loss", "time_dependent", help="loss type")
 flags.DEFINE_string("ft_grid", "3d", help="grid Fourier transform type")
 flags.DEFINE_string("boundary_conditions", "neumann", help="boundary conditions")
@@ -125,6 +125,7 @@ def build_p0() -> HeatGP:
 # Define the model
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda:0" if use_cuda else "cpu")
+print("Using seed: ", FLAGS.seed)
 torch.manual_seed(FLAGS.seed)
 
 new_net = UNetModelWrapper(

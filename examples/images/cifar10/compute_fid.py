@@ -36,6 +36,8 @@ FLAGS(sys.argv)
 # Define the model
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda:0" if use_cuda else "cpu")
+
+print("Using seed: ", FLAGS.seed)
 torch.manual_seed(FLAGS.seed)
 
 new_net = UNetModelWrapper(
