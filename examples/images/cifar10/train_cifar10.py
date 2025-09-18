@@ -58,6 +58,7 @@ def warmup_lr(step):
 
 
 def train(argv):
+    torch.manual_seed(FLAGS.seed)
     print(
         "lr, total_steps, ema decay, save_step:",
         FLAGS.lr,
@@ -66,7 +67,6 @@ def train(argv):
         FLAGS.save_step,
         FLAGS.seed,
     )
-    torch.manual_seed(FLAGS.seed)
 
     # DATASETS/DATALOADER
     dataset = datasets.CIFAR10(
