@@ -22,6 +22,7 @@ flags.DEFINE_integer("num_channel", 128, help="base channel of UNet")
 # Training
 flags.DEFINE_string("input_dir", "./results", help="output_directory")
 flags.DEFINE_string("model", "otcfm", help="flow matching model type")
+flags.DEFINE_integer("seed", 0, help="Seed for reproducibility")
 flags.DEFINE_integer("integration_steps", 100, help="number of inference steps")
 flags.DEFINE_string("integration_method", "dopri5", help="integration method to use")
 flags.DEFINE_integer("step", 400000, help="training steps")
@@ -35,6 +36,7 @@ FLAGS(sys.argv)
 # Define the model
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda:0" if use_cuda else "cpu")
+torch.manual_seed(FLAGS.seed)
 
 new_net = UNetModelWrapper(
     dim=(3, 32, 32),
@@ -49,7 +51,8 @@ new_net = UNetModelWrapper(
 
 
 # Load the model
-PATH = f"{FLAGS.input_dir}/{FLAGS.model}/{FLAGS.model}_cifar10_weights_step_{FLAGS.step}.pt"
+file_name = f"{FLAGS.model}_seed_{FLAGS.seed}"
+PATH = f"{FLAGS.input_dir}/{file_name}/{file_name}_cifar10_weights_step_{FLAGS.step}.pt"
 print("path: ", PATH)
 checkpoint = torch.load(PATH, map_location=device)
 state_dict = checkpoint["ema_model"]
@@ -66,6 +69,7 @@ new_net.eval()
 
 
 # Define the integration method if euler is used
+print("Use method: ", FLAGS.integration_method)
 if FLAGS.integration_method == "euler":
     node = NeuralODE(new_net, solver=FLAGS.integration_method)
 
@@ -74,11 +78,9 @@ def gen_1_img(unused_latent):
     with torch.no_grad():
         x = torch.randn(FLAGS.batch_size_fid, 3, 32, 32, device=device)
         if FLAGS.integration_method == "euler":
-            print("Use method: ", FLAGS.integration_method)
             t_span = torch.linspace(0, 1, FLAGS.integration_steps + 1, device=device)
             traj = node.trajectory(x, t_span=t_span)
         else:
-            print("Use method: ", FLAGS.integration_method)
             t_span = torch.linspace(0, 1, 2, device=device)
             traj = odeint(
                 new_net, x, t_span, rtol=FLAGS.tol, atol=FLAGS.tol, method=FLAGS.integration_method
@@ -88,19 +90,20 @@ def gen_1_img(unused_latent):
     return img
 
 
-print("Start computing FID")
-score = fid.compute_fid(
-    gen=gen_1_img,
-    dataset_name="cifar10",
-    batch_size=FLAGS.batch_size_fid,
-    dataset_res=32,
-    num_gen=FLAGS.num_gen,
-    dataset_split="train",
-    mode="legacy_tensorflow",
-)
-print()
-print("FID has been computed")
-# print()
-# print("Total NFE: ", new_net.nfe)
-print()
-print("FID: ", score)
+for split in ["train", "test"]:
+    print(f"Start computing FID on {split} split")
+    score = fid.compute_fid(
+        gen=gen_1_img,
+        dataset_name="cifar10",
+        batch_size=FLAGS.batch_size_fid,
+        dataset_res=32,
+        num_gen=FLAGS.num_gen,
+        dataset_split=split,
+        mode="legacy_tensorflow",
+    )
+    print()
+    print(f"FID has been computed on {split} split")
+    # print()
+    # print("Total NFE: ", new_net.nfe)
+    print()
+    print(f"FID on {split} split: ", score)

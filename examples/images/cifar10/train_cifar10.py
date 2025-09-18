@@ -25,6 +25,8 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string("model", "otcfm", help="flow matching model type")
 flags.DEFINE_string("output_dir", "./results/", help="output_directory")
+flags.DEFINE_integer("seed", 0, help="Seed for reproducibility")
+
 # UNet
 flags.DEFINE_integer("num_channel", 128, help="base channel of UNet")
 
@@ -50,6 +52,7 @@ flags.DEFINE_integer(
 
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
+torch.manual_seed(FLAGS.seed)
 
 
 def warmup_lr(step):
@@ -136,7 +139,8 @@ def train(argv):
             f"Unknown model {FLAGS.model}, must be one of ['otcfm', 'icfm', 'fm', 'si']"
         )
 
-    savedir = FLAGS.output_dir + FLAGS.model + "/"
+    file_name = f"{FLAGS.model}_seed_{FLAGS.seed}"
+    savedir = FLAGS.output_dir + file_name + "/"
     os.makedirs(savedir, exist_ok=True)
 
     with trange(FLAGS.total_steps, dynamic_ncols=True) as pbar:
@@ -165,7 +169,7 @@ def train(argv):
                         "optim": optim.state_dict(),
                         "step": step,
                     },
-                    savedir + f"{FLAGS.model}_cifar10_weights_step_{step}.pt",
+                    savedir + f"{file_name}_cifar10_weights_step_{step}.pt",
                 )
 
 

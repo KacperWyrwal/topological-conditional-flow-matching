@@ -30,12 +30,12 @@ from torchcfm.models.unet.unet import UNetModelWrapper
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string("model", "otcfm", help="flow matching model type")
-flags.DEFINE_string("output_dir", "./results/", help="output_directory")
 flags.DEFINE_string("p0", "gp", help="initial distribution type")
 flags.DEFINE_string("loss", "time_dependent", help="loss type")
 flags.DEFINE_string("ft_grid", "3d", help="grid Fourier transform type")
 flags.DEFINE_string("boundary_conditions", "neumann", help="boundary conditions")
 flags.DEFINE_integer("seed", 0, help="Seed for reproducibility")
+flags.DEFINE_string("output_dir", "./results/", help="output_directory")
 
 # UNet
 flags.DEFINE_integer("num_channel", 128, help="base channel of UNet")
