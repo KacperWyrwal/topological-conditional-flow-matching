@@ -162,6 +162,8 @@ def train(argv):
     SAVE_NAME = FLAGS.model + "-" + FLAGS.p0 + "-" + FLAGS.loss + "-" + str(FLAGS.c) 
     if FLAGS.ft_grid == "2d":
         SAVE_NAME += "-" + FLAGS.ft_grid
+    if FLAGS.seed != 0:
+        SAVE_NAME += "-" + str(FLAGS.seed)
     print(
         "lr, total_steps, ema decay, save_step:",
         FLAGS.lr,

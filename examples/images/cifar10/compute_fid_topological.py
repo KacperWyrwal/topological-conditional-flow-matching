@@ -143,6 +143,8 @@ new_net = UNetModelWrapper(
 SAVE_NAME = FLAGS.model + "-" + FLAGS.p0 + "-" + FLAGS.loss + "-" + str(FLAGS.c)
 if FLAGS.ft_grid == "2d":
     SAVE_NAME += "-" + FLAGS.ft_grid
+if FLAGS.seed != 0:
+    SAVE_NAME += "-" + str(FLAGS.seed)
 PATH = f"{FLAGS.input_dir}/{SAVE_NAME}/{SAVE_NAME}_cifar10_weights_step_{FLAGS.step}.pt"
 print("path: ", PATH)
 checkpoint = torch.load(PATH, map_location=device)
