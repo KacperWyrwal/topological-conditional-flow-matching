@@ -35,6 +35,7 @@ flags.DEFINE_string("p0", "gp", help="initial distribution type")
 flags.DEFINE_string("loss", "time_dependent", help="loss type")
 flags.DEFINE_string("ft_grid", "3d", help="grid Fourier transform type")
 flags.DEFINE_string("boundary_conditions", "neumann", help="boundary conditions")
+flags.DEFINE_integer("seed", 0, help="Seed for reproducibility")
 
 # UNet
 flags.DEFINE_integer("num_channel", 128, help="base channel of UNet")
@@ -62,6 +63,7 @@ flags.DEFINE_integer(
 
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
+torch.manual_seed(FLAGS.seed)
 
 
 def warmup_lr(step):

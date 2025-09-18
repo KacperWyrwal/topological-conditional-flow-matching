@@ -32,6 +32,7 @@ flags.DEFINE_integer("step", 400000, help="training steps")
 flags.DEFINE_integer("num_gen", 50000, help="number of samples to generate")
 flags.DEFINE_float("tol", 1e-5, help="Integrator tolerance (absolute and relative)")
 flags.DEFINE_integer("batch_size_fid", 1024, help="Batch size to compute FID")
+flags.DEFINE_integer("seed", 0, help="Seed for reproducibility")
 
 flags.DEFINE_string("p0", "gp", help="initial distribution type")
 flags.DEFINE_float("c", 1.0, help="c parameter for topological flow matcher")
@@ -50,8 +51,8 @@ def build_eigenbasis(input_shape):
             boundary_conditions=FLAGS.boundary_conditions,
             device=device,
         )
-        eigvecs = torch.kron(torch.eye(C, device=device, dtype=eigvecs.dtype), eigvecs)
-        eigvals = torch.kron(torch.ones(C, device=device, dtype=eigvals.dtype), eigvals)
+        eigvecs = torch.kron(torch.eye(C, device=device, dtype=eig), eigvecs)
+        eigvals = torch.kron(torch.ones(C, device=device, dtype=eig), eigvals)
         return eigvecs, eigvals
     elif FLAGS.ft_grid == "3d":
         eigvecs, eigvals = grid_laplacian_eigenpairs(
@@ -124,6 +125,7 @@ def build_p0() -> HeatGP:
 # Define the model
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda:0" if use_cuda else "cpu")
+torch.manual_seed(FLAGS.seed)
 
 new_net = UNetModelWrapper(
     dim=(3, 32, 32),
