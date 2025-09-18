@@ -67,7 +67,6 @@ def train(argv):
         FLAGS.save_step,
         FLAGS.seed,
     )
-    torch.manual_seed(FLAGS.seed)
 
     # DATASETS/DATALOADER
     dataset = datasets.CIFAR10(
