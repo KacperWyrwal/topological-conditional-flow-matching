@@ -51,8 +51,8 @@ def build_eigenbasis(input_shape):
             boundary_conditions=FLAGS.boundary_conditions,
             device=device,
         )
-        eigvecs = torch.kron(torch.eye(C, device=device, dtype=eig), eigvecs)
-        eigvals = torch.kron(torch.ones(C, device=device, dtype=eig), eigvals)
+        eigvecs = torch.kron(torch.eye(C, device=device, dtype=eigvecs.dtype), eigvecs)
+        eigvals = torch.kron(torch.ones(C, device=device, dtype=eigvals.dtype), eigvals)
         return eigvecs, eigvals
     elif FLAGS.ft_grid == "3d":
         eigvecs, eigvals = grid_laplacian_eigenpairs(
