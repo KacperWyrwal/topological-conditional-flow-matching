@@ -165,13 +165,14 @@ def train(argv):
     if FLAGS.seed != 0:
         SAVE_NAME += "-" + str(FLAGS.seed)
     print(
-        "lr, total_steps, ema decay, save_step:",
+        "lr, total_steps, ema decay, save_step, seed:",
         FLAGS.lr,
         FLAGS.total_steps,
         FLAGS.ema_decay,
         FLAGS.save_step,
         FLAGS.seed,
     )
+    print(f"model, p0, loss, c, ft_grid, boundary_conditions: {FLAGS.model}, {FLAGS.p0}, {FLAGS.loss}, {FLAGS.c}, {FLAGS.ft_grid}, {FLAGS.boundary_conditions}")
 
     # DATASETS/DATALOADER
     dataset = datasets.CIFAR10(
